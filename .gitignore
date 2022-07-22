@@ -1,0 +1,8 @@
+# dataset and trained models are too big for the repo
+dataset/
+*.h5
+*.tflite
+training_plot.png
+
+__pycache__/
+venv/
