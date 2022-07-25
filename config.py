@@ -1,6 +1,7 @@
 # GPIO pins, BCM numbering
 IR_CHECK_PIN = 17   # IR sensor where the person stands for the checks
 IR_DOOR_PIN = 27    # IR sensor in the doorway
+IR_EXIT_PIN = 22    # IR sensor on the inside, for people going out
 TRIG_PIN = 23       # HC-SR04 at the sanitizer
 ECHO_PIN = 24       # through a voltage divider, echo is 5V
 SERVO_PIN = 18
@@ -26,3 +27,6 @@ SANITIZE_WAIT = 10    # seconds
 DOOR_CLOSED_ANGLE = 0
 DOOR_OPEN_ANGLE = 90
 DOOR_OPEN_TIME = 8    # seconds to wait for the person to walk through
+
+MAX_PEOPLE = 20
+LOG_FILE = "logs/entries.csv"

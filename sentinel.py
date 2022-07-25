@@ -1,7 +1,10 @@
 # THE SENTINEL - COVID-19 safe entry system
 # Runs on the Raspberry Pi: mask check, temperature check, hand sanitizer,
-# then opens the door.
+# then opens the door and keeps count of how many people are inside.
+import csv
+import os
 import time
+from datetime import datetime
 
 import cv2
 import RPi.GPIO as GPIO
@@ -15,7 +18,7 @@ from mask_detector import MaskDetector
 def setup_gpio():
     GPIO.setmode(GPIO.BCM)
     GPIO.setwarnings(False)
-    for pin in (config.IR_CHECK_PIN, config.IR_DOOR_PIN, config.ECHO_PIN):
+    for pin in (config.IR_CHECK_PIN, config.IR_DOOR_PIN, config.IR_EXIT_PIN, config.ECHO_PIN):
         GPIO.setup(pin, GPIO.IN)
     GPIO.setup(config.TRIG_PIN, GPIO.OUT, initial=GPIO.LOW)
     GPIO.setup(config.BUZZER_PIN, GPIO.OUT, initial=GPIO.LOW)
@@ -123,8 +126,26 @@ def let_through(servo):
     return passed
 
 
-def check_person(cam, detector, sensor):
+def log_entry(result, temp, score, inside):
+    folder = os.path.dirname(config.LOG_FILE)
+    if folder:
+        os.makedirs(folder, exist_ok=True)
+    new_file = not os.path.exists(config.LOG_FILE)
+    with open(config.LOG_FILE, "a", newline="") as f:
+        writer = csv.writer(f)
+        if new_file:
+            writer.writerow(["time", "result", "temperature", "no_mask_score", "inside"])
+        writer.writerow([datetime.now().strftime("%Y-%m-%d %H:%M:%S"), result,
+                         "" if temp is None else "%.1f" % temp,
+                         "" if score is None else "%.2f" % score, inside])
+
+
+def check_person(cam, detector, sensor, inside):
     # returns (allowed, result, temperature, no mask score)
+    if inside >= config.MAX_PEOPLE:
+        print("Building is full")
+        return False, "full", None, None
+
     print("Checking mask...")
     score = check_mask(cam, detector)
     if score is None:
@@ -159,20 +180,32 @@ def main():
     detector = MaskDetector(model_path=config.MODEL_PATH)
     cam = cv2.VideoCapture(config.CAMERA_INDEX)
 
+    inside = 0
     checked = False  # so a person standing at the check is only checked once
     print("Sentinel ready")
     try:
         while True:
-            if ir_blocked(config.IR_CHECK_PIN) and not checked:
+            if ir_blocked(config.IR_EXIT_PIN):
+                print("Person leaving")
+                if let_through(servo):
+                    inside = max(0, inside - 1)
+                    log_entry("exit", None, None, inside)
+                print("People inside:", inside)
+
+            elif ir_blocked(config.IR_CHECK_PIN) and not checked:
                 checked = True
                 print("Person at the entrance")
-                allowed, result, temp, score = check_person(cam, detector, sensor)
-                print("Result:", result)
+                allowed, result, temp, score = check_person(cam, detector, sensor, inside)
                 if allowed:
                     beep(2, 0.1)
-                    let_through(servo)
+                    if let_through(servo):
+                        inside += 1
+                    else:
+                        result = "did not enter"
                 else:
                     beep(3, 0.5)
+                log_entry(result, temp, score, inside)
+                print("People inside:", inside)
 
             elif not ir_blocked(config.IR_CHECK_PIN):
                 checked = False

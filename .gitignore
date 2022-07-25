@@ -7,3 +7,4 @@ training_plot.png
 
 __pycache__/
 venv/
+logs/
