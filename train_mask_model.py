@@ -1,10 +1,11 @@
 """Train the mask / no mask classifier on a PC and export it for the Pi.
 
-Dataset folder layout:
-    dataset/with_mask/*.jpg
-    dataset/without_mask/*.jpg
+Dataset folder layout (made by split_dataset.py):
+    dataset/train/with_mask/*.jpg
+    dataset/train/without_mask/*.jpg
 """
 import argparse
+import os
 
 import matplotlib
 matplotlib.use("Agg")
@@ -15,7 +16,7 @@ IMG_SIZE = 224
 BATCH_SIZE = 32
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--dataset", default="dataset")
+parser.add_argument("--dataset", default="dataset/train")
 parser.add_argument("--epochs", type=int, default=10)
 parser.add_argument("--output", default="mask_model")
 args = parser.parse_args()
@@ -79,4 +80,5 @@ plt.plot(history.history["accuracy"], label="train")
 plt.plot(history.history["val_accuracy"], label="val")
 plt.title("Accuracy")
 plt.legend()
-plt.savefig("training_plot.png")
+os.makedirs("results", exist_ok=True)
+plt.savefig("results/training_plot.png")
