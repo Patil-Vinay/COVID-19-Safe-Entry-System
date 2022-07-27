@@ -1,8 +1,8 @@
-# dataset and trained models are too big for the repo
+# dataset and big model files are not kept in the repo
 dataset/
 *.h5
 *.tflite
-training_plot.png
+!mask_model.tflite
 *.caffemodel
 
 __pycache__/

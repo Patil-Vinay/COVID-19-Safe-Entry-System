@@ -63,7 +63,10 @@ history = model.fit(train_ds, validation_data=val_ds, epochs=args.epochs)
 model.save(args.output + ".h5")
 
 converter = tf.lite.TFLiteConverter.from_keras_model(model)
+# float16 weights make the file half the size and it still runs fast,
+# the default 8 bit version took over a second per image
 converter.optimizations = [tf.lite.Optimize.DEFAULT]
+converter.target_spec.supported_types = [tf.float16]
 with open(args.output + ".tflite", "wb") as f:
     f.write(converter.convert())
 print("Saved", args.output + ".h5 and", args.output + ".tflite")
