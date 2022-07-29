@@ -1,3 +1,5 @@
+import os
+
 import cv2
 import numpy as np
 
@@ -8,12 +10,17 @@ except ImportError:
     import tensorflow as tf
     Interpreter = tf.lite.Interpreter
 
+HERE = os.path.dirname(os.path.abspath(__file__))
+
 
 class MaskDetector:
-    def __init__(self, model_path="mask_model.tflite",
-                 prototxt="face_detector/deploy.prototxt",
-                 weights="face_detector/res10_300x300_ssd_iter_140000.caffemodel",
+    def __init__(self, model_path=os.path.join(HERE, "mask_model.tflite"),
+                 prototxt=os.path.join(HERE, "face_detector", "deploy.prototxt"),
+                 weights=os.path.join(HERE, "face_detector", "res10_300x300_ssd_iter_140000.caffemodel"),
                  face_confidence=0.5):
+        for path in (model_path, prototxt, weights):
+            if not os.path.exists(path):
+                raise FileNotFoundError(path + " not found, see the README")
         # OpenCV's SSD face detector, works better on masked faces than haar cascades
         self.face_net = cv2.dnn.readNetFromCaffe(prototxt, weights)
         self.face_confidence = face_confidence

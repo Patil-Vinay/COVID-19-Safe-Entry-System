@@ -177,7 +177,7 @@ def main():
     set_door(servo, config.DOOR_CLOSED_ANGLE)
     bus = SMBus(1)
     sensor = MLX90614(bus, address=config.MLX_ADDRESS)
-    detector = MaskDetector(model_path=config.MODEL_PATH)
+    detector = MaskDetector(config.MODEL_PATH, config.FACE_PROTOTXT, config.FACE_WEIGHTS)
     cam = cv2.VideoCapture(config.CAMERA_INDEX)
 
     inside = 0

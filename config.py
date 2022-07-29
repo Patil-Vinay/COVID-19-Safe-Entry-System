@@ -1,3 +1,8 @@
+import os
+
+# files are found next to this script, so it can be started from any folder
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
 # GPIO pins, BCM numbering
 IR_CHECK_PIN = 17   # IR sensor where the person stands for the checks
 IR_DOOR_PIN = 27    # IR sensor in the doorway
@@ -14,7 +19,9 @@ TEMP_OFFSET = 0.0   # change after comparing with a normal thermometer
 
 # camera and mask model
 CAMERA_INDEX = 0
-MODEL_PATH = "mask_model.tflite"
+MODEL_PATH = os.path.join(BASE_DIR, "mask_model.tflite")
+FACE_PROTOTXT = os.path.join(BASE_DIR, "face_detector", "deploy.prototxt")
+FACE_WEIGHTS = os.path.join(BASE_DIR, "face_detector", "res10_300x300_ssd_iter_140000.caffemodel")
 NO_MASK_LIMIT = 0.5   # model score above this means no mask
 MASK_CHECK_TIME = 5   # seconds to look for a face
 SHOW_CAMERA = False   # set True if a screen is connected
@@ -29,4 +36,4 @@ DOOR_OPEN_ANGLE = 90
 DOOR_OPEN_TIME = 8    # seconds to wait for the person to walk through
 
 MAX_PEOPLE = 20
-LOG_FILE = "logs/entries.csv"
+LOG_FILE = os.path.join(BASE_DIR, "logs", "entries.csv")

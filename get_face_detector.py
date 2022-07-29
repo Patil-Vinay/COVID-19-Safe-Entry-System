@@ -5,7 +5,8 @@ import urllib.request
 
 URL = ("https://github.com/opencv/opencv_3rdparty/raw/"
        "dnn_samples_face_detector_20170830/res10_300x300_ssd_iter_140000.caffemodel")
-PATH = "face_detector/res10_300x300_ssd_iter_140000.caffemodel"
+PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "face_detector",
+                    "res10_300x300_ssd_iter_140000.caffemodel")
 
 if os.path.exists(PATH):
     print(PATH, "is already there")
