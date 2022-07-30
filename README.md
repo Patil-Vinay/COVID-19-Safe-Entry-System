@@ -62,7 +62,7 @@ Pins and limits can be changed in `config.py`.
 | `hardware_test.py` | Tests buzzer, servo, IR sensors, ultrasonic and temperature sensor one by one |
 | `mlx90614_sensor_testing.py` | Prints readings from the MLX90614 to test the wiring |
 | `get_face_detector.py` | Downloads the face detector weights into `face_detector/` |
-| `split_dataset.py` | Splits the images into train and test folders and removes duplicate images |
+| `split_dataset.py` | Splits the images into train, val and test folders, keeping copies of the same photo together |
 | `train_mask_model.py` | Trains the mask model on a PC and saves `.h5` and `.tflite` |
 | `evaluate_model.py` | Tests the `.tflite` model on the test images |
 | `results/` | Training plot and confusion matrix |
@@ -72,21 +72,38 @@ Pins and limits can be changed in `config.py`.
 ### Dataset
 
 We used the face mask dataset by Prajna Bhandary ([prajnasb/observations](https://github.com/prajnasb/observations), folder `experiements/data`).
-It has 690 images with a mask and 686 without. 97 of them are exact copies of other images, so `split_dataset.py` removes those
-before splitting. That leaves 644 with mask and 635 without, split 80 / 20 into train and test.
+It has 690 images with a mask and 686 without.
+
+This dataset has many copies of the same photo. 97 files are exact copies, the `augmented_image_*` files are mirrored or edited
+versions of other photos and the "with mask" images are the "without mask" photos with a mask pasted on.
+If copies of a photo end up in both train and test, the model has already seen the test photos and the accuracy looks better than it is.
+
+`split_dataset.py` handles this. It removes the exact copies, then compares every image using a 256 bit image hash
+(also of the mirrored image and of the top half only, which a mask does not cover) and puts similar images in one group.
+A whole group always goes into the same folder. The limit of 44 different bits was picked by looking at image pairs:
+up to 44 they were all the same photo, above it different people with the same background started to show up.
 
 ```
 python split_dataset.py --source observations/experiements/data
 ```
 
+This gives 1279 images in 679 groups:
+
+| Folder | with_mask | without_mask |
+|---|---|---|
+| train | 453 | 442 |
+| val | 62 | 66 |
+| test | 129 | 127 |
+
 ### Training
 
 Done on a PC, not on the Pi. MobileNetV2 trained on ImageNet is used as the base and only the new top layers are trained
-(10 epochs, Adam, learning rate 0.0001). 20% of the train images are used for validation.
+(Adam, learning rate 0.001). Training stops when the val loss has not gone down by at least 0.001 for 5 epochs
+and the weights of the best epoch are kept. In our run it stopped after 26 epochs and kept epoch 21.
 
 ```
 pip install -r requirements-train.txt
-python train_mask_model.py --epochs 10
+python train_mask_model.py
 ```
 
 This saves `mask_model.h5` (not kept in the repo), `mask_model.tflite` and `results/training_plot.png`.
@@ -96,7 +113,8 @@ The TFLite model is saved with float16 weights. The default 8 bit version was sm
 
 ### Results
 
-`evaluate_model.py` runs the `.tflite` model on the 255 test images that were never used in training.
+`evaluate_model.py` runs the `.tflite` model on the 256 test images. None of them, or any copy of them,
+was used for training or for deciding when to stop.
 
 ```
 python evaluate_model.py
@@ -104,24 +122,28 @@ python evaluate_model.py
 
 | | Precision | Recall |
 |---|---|---|
-| with_mask (128 images) | 1.000 | 0.953 |
-| without_mask (127 images) | 0.955 | 1.000 |
+| with_mask (129 images) | 1.000 | 0.992 |
+| without_mask (127 images) | 0.992 | 1.000 |
 
-Test accuracy: **97.65%** (249 of 255).
-No person without a mask was classified as wearing one. 6 people with a mask were classified as no mask, so they would be asked to try again.
+Test accuracy: **99.61%** (255 of 256).
+No person without a mask was classified as wearing one. 1 person with a mask was classified as no mask and would be asked to try again.
 
 ![Confusion matrix](results/confusion_matrix.png)
 
-The masks in the "with mask" images of this dataset were added to normal face photos, so they all look alike.
-Real masks of other colours and shapes can give lower accuracy. Adding real photos to `dataset/train` and training again will help.
+All masks in this dataset are the same pasted blue mask, so the test is easy for the model.
+Real masks of other colours and shapes can give lower accuracy. Adding real photos to the dataset and training again will help.
 
 ## Running on the Raspberry Pi
 
+Written for Raspberry Pi OS Bullseye (Python 3.9) with the legacy camera stack.
+
 1. Enable I2C and the legacy camera in `sudo raspi-config`.
-2. Install the libraries:
+2. Install the libraries. numpy and OpenCV from piwheels need the ATLAS library on the 32 bit OS:
    ```
+   sudo apt install libatlas-base-dev
    pip3 install -r requirements.txt
    ```
+   If OpenCV still says a `.so` file is missing, the opencv-python page on piwheels.org lists the other system packages it needs.
 3. Download the face detector weights:
    ```
    python3 get_face_detector.py
@@ -138,7 +160,8 @@ Real masks of other colours and shapes can give lower accuracy. Adding real phot
    python3 sentinel.py
    ```
 
-Press Ctrl+C to stop. The door closes and the GPIO pins are cleaned up.
+The model, face detector and log paths are taken from the project folder, so `sentinel.py` can also be started from
+another folder, for example at boot. Press Ctrl+C to stop. The door closes and the GPIO pins are cleaned up.
 
 ## Prototype
 
