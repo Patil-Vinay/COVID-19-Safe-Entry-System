@@ -12,7 +12,10 @@ from smbus2 import SMBus
 from mlx90614 import MLX90614
 
 import config
+import display
 from mask_detector import MaskDetector
+
+screen = None  # display.EntranceScreen, made in main()
 
 
 def setup_gpio():
@@ -61,6 +64,14 @@ def get_distance():
     return (stop - start) * 34300 / 2  # cm
 
 
+def status(message, color):
+    # shows the message in the terminal and on the entrance screen
+    print(message)
+    screen.message = message
+    screen.color = color
+    screen.refresh()
+
+
 def set_door(servo, angle):
     servo.ChangeDutyCycle(2.5 + angle / 18)
     time.sleep(0.5)
@@ -89,11 +100,13 @@ def check_mask(cam, detector):
         box, score = detector.check(frame)
         if box is not None:
             scores.append(score)
-        if config.SHOW_CAMERA:
-            if box is not None:
-                cv2.rectangle(frame, box[:2], box[2:], (255, 255, 0), 2)
-            cv2.imshow("Sentinel", frame)
-            cv2.waitKey(1)
+            if score > config.NO_MASK_LIMIT:
+                screen.set_frame(frame, box, "No mask", display.RED)
+            else:
+                screen.set_frame(frame, box, "Mask", display.GREEN)
+        else:
+            screen.set_frame(frame)
+        screen.refresh()
     if len(scores) < 3:
         return None
     return sum(scores) / len(scores)
@@ -105,6 +118,7 @@ def wait_for_hand():
         d = get_distance()
         if d is not None and d < config.HAND_DISTANCE:
             return True
+        screen.refresh()
         time.sleep(0.1)
     return False
 
@@ -120,6 +134,7 @@ def let_through(servo):
             passed = True
         elif passed:
             break
+        screen.refresh()
         time.sleep(0.05)
     time.sleep(0.5)
     set_door(servo, config.DOOR_CLOSED_ANGLE)
@@ -143,36 +158,49 @@ def log_entry(result, temp, score, inside):
 def check_person(cam, detector, sensor, inside):
     # returns (allowed, result, temperature, no mask score)
     if inside >= config.MAX_PEOPLE:
-        print("Building is full")
+        status("Building is full, please wait", display.RED)
         return False, "full", None, None
 
-    print("Checking mask...")
+    screen.set_step("Mask", "checking...", display.YELLOW)
+    status("Please look at the camera", display.YELLOW)
     score = check_mask(cam, detector)
     if score is None:
-        print("No face found, look at the camera")
+        screen.set_step("Mask", "no face found", display.RED)
+        status("No face found, please look at the camera", display.RED)
         return False, "no face", None, None
+    print("No mask score: %.2f" % score)
     if score > config.NO_MASK_LIMIT:
-        print("No mask (score %.2f)" % score)
+        screen.set_step("Mask", "no mask", display.RED)
+        status("Please wear a mask", display.RED)
         return False, "no mask", None, score
-    print("Mask ok (score %.2f)" % score)
+    screen.set_step("Mask", "ok", display.GREEN)
     beep()
 
+    screen.set_step("Temperature", "checking...", display.YELLOW)
+    status("Checking temperature", display.YELLOW)
     temp = read_temperature(sensor)
     if temp > config.TEMP_LIMIT:
-        print("Temperature too high: %.1f C" % temp)
+        screen.set_step("Temperature", "%.1f C" % temp, display.RED)
+        status("Temperature too high: %.1f C" % temp, display.RED)
         return False, "high temperature", temp, score
-    print("Temperature ok: %.1f C" % temp)
+    screen.set_step("Temperature", "%.1f C" % temp, display.GREEN)
     beep()
 
-    print("Put your hand under the sanitizer")
+    screen.set_step("Sanitizer", "waiting...", display.YELLOW)
+    status("Put your hand under the sanitizer", display.YELLOW)
     if not wait_for_hand():
-        print("Hands not sanitized")
+        screen.set_step("Sanitizer", "not used", display.RED)
+        status("Hands not sanitized", display.RED)
         return False, "not sanitized", temp, score
-    print("Hands sanitized")
+    screen.set_step("Sanitizer", "done", display.GREEN)
     return True, "allowed", temp, score
 
 
 def main():
+    global screen
+    screen = display.EntranceScreen(config.MAX_PEOPLE,
+                                    config.SHOW_SCREEN and display.screen_available(),
+                                    config.FULLSCREEN)
     servo = setup_gpio()
     set_door(servo, config.DOOR_CLOSED_ANGLE)
     bus = SMBus(1)
@@ -186,10 +214,12 @@ def main():
     try:
         while True:
             if ir_blocked(config.IR_EXIT_PIN):
-                print("Person leaving")
+                status("Goodbye", display.GREEN)
                 if let_through(servo):
                     inside = max(0, inside - 1)
                     log_entry("exit", None, None, inside)
+                screen.inside = inside
+                screen.reset()
                 print("People inside:", inside)
 
             elif ir_blocked(config.IR_CHECK_PIN) and not checked:
@@ -197,6 +227,7 @@ def main():
                 print("Person at the entrance")
                 allowed, result, temp, score = check_person(cam, detector, sensor, inside)
                 if allowed:
+                    status("Welcome, please go in", display.GREEN)
                     beep(2, 0.1)
                     if let_through(servo):
                         inside += 1
@@ -205,11 +236,22 @@ def main():
                 else:
                     beep(3, 0.5)
                 log_entry(result, temp, score, inside)
+                screen.inside = inside
                 print("People inside:", inside)
 
             elif not ir_blocked(config.IR_CHECK_PIN):
+                # the result stays on the screen until the person steps away
+                if checked:
+                    screen.reset()
                 checked = False
 
+            # live camera while waiting, the checked frame stays up with the result
+            if screen.enabled:
+                if not checked:
+                    ok, frame = cam.read()
+                    if ok:
+                        screen.set_frame(frame)
+                screen.refresh()
             time.sleep(0.05)
     except KeyboardInterrupt:
         print("Stopping")

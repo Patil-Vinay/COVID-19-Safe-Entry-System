@@ -24,7 +24,10 @@ FACE_PROTOTXT = os.path.join(BASE_DIR, "face_detector", "deploy.prototxt")
 FACE_WEIGHTS = os.path.join(BASE_DIR, "face_detector", "res10_300x300_ssd_iter_140000.caffemodel")
 NO_MASK_LIMIT = 0.5   # model score above this means no mask
 MASK_CHECK_TIME = 5   # seconds to look for a face
-SHOW_CAMERA = False   # set True if a screen is connected
+
+# entrance screen, only used when the Pi desktop is running
+SHOW_SCREEN = True
+FULLSCREEN = True
 
 # sanitizer
 HAND_DISTANCE = 10    # cm
