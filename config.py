@@ -40,3 +40,4 @@ DOOR_OPEN_TIME = 8    # seconds to wait for the person to walk through
 
 MAX_PEOPLE = 20
 LOG_FILE = os.path.join(BASE_DIR, "logs", "entries.csv")
+RESET_FILE = os.path.join(BASE_DIR, "logs", "reset")  # made by the dashboard

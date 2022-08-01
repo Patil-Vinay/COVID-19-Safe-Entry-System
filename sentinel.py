@@ -210,9 +210,19 @@ def main():
 
     inside = 0
     checked = False  # so a person standing at the check is only checked once
+    if os.path.exists(config.RESET_FILE):
+        os.remove(config.RESET_FILE)
+    log_entry("started", None, None, inside)
     print("Sentinel ready")
     try:
         while True:
+            if os.path.exists(config.RESET_FILE):
+                os.remove(config.RESET_FILE)
+                inside = 0
+                screen.inside = inside
+                log_entry("count reset", None, None, inside)
+                print("Count reset from the dashboard")
+
             if ir_blocked(config.IR_EXIT_PIN):
                 status("Goodbye", display.GREEN)
                 if let_through(servo):
