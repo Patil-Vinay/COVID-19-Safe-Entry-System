@@ -26,6 +26,34 @@ Buzzer:
 - two short beeps when the door opens
 - three long beeps when entry is refused
 
+## Entrance screen
+
+If a screen is connected to the Pi, `sentinel.py` shows a full screen window at the entrance with the camera,
+the face box (green for mask, red for no mask), each check as it happens, the message for the person and how many people are inside.
+The result stays on the screen until the person steps away from the check point. Press Esc to close it.
+
+Without a screen (no desktop running) the system works the same with only the buzzer.
+The screen can also be turned off with `SHOW_SCREEN` in `config.py`.
+
+![Entrance screen](screenshots/entrance_screen.png)
+
+## Staff dashboard
+
+`dashboard.py` is a small Flask web page for the staff. It runs on the Pi next to `sentinel.py` and can be opened
+from a phone or laptop on the same Wi-Fi at `http://<pi address>:5000`. It shows:
+
+- people inside right now
+- how many entered, left and were refused today
+- why people were refused
+- the last 20 events with temperature and mask score
+
+It reads `logs/entries.csv` and updates every 5 seconds. The "Reset count" button sets the count to 0,
+for example at closing time. The page has no login, so only run it on a private network.
+
+![Staff dashboard](screenshots/dashboard.png)
+
+The screenshots are from a test run on a PC with simulated sensors and sample images from the dataset. Faces are blurred.
+
 ## Hardware
 
 - Raspberry Pi 4 Model B
@@ -35,6 +63,7 @@ Buzzer:
 - HC-SR04 ultrasonic sensor
 - Servo motor for the door
 - Buzzer
+- Screen on the HDMI port (optional, for the entrance screen)
 
 | Part | Pi pin (BCM) |
 |---|---|
@@ -57,6 +86,8 @@ Pins and limits can be changed in `config.py`.
 |---|---|
 | `sentinel.py` | Main program that runs on the Pi |
 | `config.py` | Pins, temperature limit, timings |
+| `display.py` | Draws the entrance screen |
+| `dashboard.py` | Web page for the staff |
 | `mask_detector.py` | Face detection + mask model. Run it alone to test with a camera |
 | `mask_model.tflite` | Trained mask model used on the Pi |
 | `hardware_test.py` | Tests buzzer, servo, IR sensors, ultrasonic and temperature sensor one by one |
@@ -155,9 +186,10 @@ Written for Raspberry Pi OS Bullseye (Python 3.9) with the legacy camera stack.
    ```
 5. Compare the MLX90614 reading with a normal thermometer and set `TEMP_OFFSET` in `config.py`.
    The sensor reads skin temperature, which is lower than body temperature.
-6. Start the system:
+6. Start the system and, in a second terminal, the staff dashboard:
    ```
    python3 sentinel.py
+   python3 dashboard.py
    ```
 
 The model, face detector and log paths are taken from the project folder, so `sentinel.py` can also be started from
